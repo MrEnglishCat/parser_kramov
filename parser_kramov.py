@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 class KramovDataClass:
     brand_name: str = None
     brand_url: str = None
-    # brand_img: str = None
+    brand_img: str = None
     brand_description: str = None
     preview: str = None
 
@@ -87,8 +87,12 @@ class KramovParser:
         soup = BeautifulSoup(response.content, 'lxml')
         position = KramovDataClass()
         position.brand_name = soup.find('a', class_='brand__picture').get('title')
+        position.brand_url = self.BASE_URL + soup.find('a', class_='brand__picture').get('href')
+        response_brand = requests.get(position.brand_url, self.HEADERS)
+        print(response_brand.status_code, position.brand_url)
+        position.brand_description = BeautifulSoup(response_brand.content, 'lxml').find('div', class_='inner_wrapper_text').find_all('p')
         # position.brand_img = soup.find('a', class_='brand__picture').find('img').get('')
-        position.brand_img_url = soup.find('a', class_='brand__picture').find('img').get('src')
+        # position.brand_img_url =
         position.preview = [''.join(filter(lambda char: char not in ('\n', '\t', '\r'), item.text.strip())) for item in soup.find('div', class_='preview-text').find_all('tr')]
 
         print(position)
