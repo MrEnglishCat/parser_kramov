@@ -89,7 +89,6 @@ class KramovParser:
             while start_pagination:
                 response = requests.get(url, headers=self.HEADERS)
                 if response.status_code == 200:
-                    print(url)
                     soup = BeautifulSoup(response.content, 'lxml')
                     self.get_items_from_page(soup, index, categories)
                     try:
