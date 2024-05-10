@@ -165,7 +165,9 @@ class KramovParser:
         # Получение объектов по моделям, размерам, типам двигателя и прочему
         varieties_of_goods = {} # словарь для размещения объектов по разновидностями товаров каждый со своими данными
         # general_block = driver.find_element(By.XPATH, '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[2]/div/div/div[2]/div[4]/div[1]/div/div[1]/div/div[2]')
-        general_block = driver.find_element(By.XPATH, '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[2]/div/div/div[2]/div[4]/div[1]/div/div[1]/div/div[2]/div/div').find_elements(By.TAG_NAME, 'div')
+        general_block = driver.find_element(By.XPATH, '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[3]/div[1]/div[1]/div[2]/div[2]/div/div')
+        self.write_to_file('TEST', 'TEST_HTML.html', general_block.get_attribute('outerHTML'), istxt=True)
+        print(general_block.get_attribute('outerHTML'))
         # for item in general_block:
         #
         #     all_elements = item.find_elements(By.TAG_NAME, 'li')
