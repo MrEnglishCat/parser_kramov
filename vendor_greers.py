@@ -8,6 +8,7 @@ from pprint import pprint
 
 import fake_useragent
 import requests
+from itertools import product
 from fake_useragent import UserAgent
 from bs4 import BeautifulSoup
 from lxml.html import fromstring
@@ -78,7 +79,6 @@ class KramovParser:
     def get_data_from_url(url, headers):
         return requests.get(url, headers=headers).content
 
-
     def get_driver(self):
         # # CHROME
         options = webdriver.ChromeOptions()
@@ -130,6 +130,39 @@ class KramovParser:
                         self.get_data_from_url(image_url, headers=self.HEADERS))
         self.write_to_file(f'data', 'DIR_LISTS.txt', self.DIR_LISTS, istxt=True)
 
+    def get_characteristics(self, driver, general_path, vendor_name, product_name):
+        # сбор данных на каждую модель
+        products_data = {}
+        # general_block_data = driver.find_element(By.XPATH, '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[3]/div[1]/div[1]/div[2]')
+        general_block_data = driver.find_element(By.XPATH,
+                                                 '//*[@id="content"]/div[2]/div/div/div/div/div/div[1]/div/div/div[3]/div[1]/div[1]/div[2]')
+        characteristics = {"description": {}, "images": {}}
+        characteristics_image_path = f"{general_path}"
+        try:
+            general_block = general_block_data.find_element(By.ID, 'props')
+            soup = BeautifulSoup(general_block.get_attribute('outerHTML'), 'lxml')
+            characteristics["description"] = general_block.get_attribute('outerHTML')
+            for tag_a in soup.find_all('a'):
+                url = f"{self.BASE_URL}{tag_a.get('href')}"
+                url_name = tag_a.find_previous('h3').text.strip()
+                characteristics["images"].setdefault(url_name, []).append(url)
+            for dir_name, url_list in characteristics["images"].items():
+                for index, u in enumerate(url_list, 1):
+                    self.save_image(
+                        characteristics_image_path,
+                        f"image_{vendor_name}_{product_name}_{str(dir_name.replace(':', '').replace('+', 'и').replace('|', 'или'))}_{index}.{u.split('.')[-1]}",
+                        self.get_data_from_url(f"{u}", headers=self.HEADERS))
+        except Exception as e:
+            print("[ALARM] Ошибка при сборе данных или раздела характеристики нету")
+            # print(e)
+        # Получение отзывов
+
+
+        products_data.setdefault('characteristics_image_path', characteristics_image_path)
+        products_data.setdefault('characteristics', characteristics)
+
+        return products_data
+
     def get_data_from_one_product(self, driver, json_data, url, DIR):
         driver.get(url)
         products_data = {}
@@ -138,10 +171,14 @@ class KramovParser:
         general_path = f"{DIR}/files/{product_name}"
         # Получение и сохранение фото товара
         photo_path = f"{general_path}/photo"
-        tags_all_photo_urls =  driver.find_element(By.XPATH, '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[2]/div/div/div[1]/div').find_elements(By.TAG_NAME, 'a')
+        tags_all_photo_urls = driver.find_element(By.XPATH,
+                                                  '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[2]/div/div/div[1]/div').find_elements(
+            By.TAG_NAME, 'a')
         all_photo_urls = [item_url.get_attribute('href') for item_url in tags_all_photo_urls]
         for index, photo in enumerate(all_photo_urls, 1):
-            self.save_image(photo_path, f"photo_{json_data['vendor_name']}_{product_name}_{index}.{photo.split('.')[-1]}", self.get_data_from_url(photo, headers=self.HEADERS))
+            self.save_image(photo_path,
+                            f"photo_{json_data['vendor_name']}_{product_name}_{index}.{photo.split('.')[-1]}",
+                            self.get_data_from_url(photo, headers=self.HEADERS))
 
         # Получение общих параметров
         general_attrs = driver.find_element(By.XPATH,
@@ -149,7 +186,7 @@ class KramovParser:
         # Получение и загрузка документов
         try:
             docs_urls = {tag_a.get_attribute('href'): tag_a.text for tag_a in driver.find_element(By.XPATH,
-                                                                                              '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[2]/div/div/div[3]/div[2]/div').find_elements(
+                                                                                                  '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[2]/div/div/div[3]/div[2]/div').find_elements(
                 By.TAG_NAME, 'a')}
         except:
             print('[ALARM] Ошибка при поиске или загрузке документа или документы не найдены')
@@ -165,7 +202,9 @@ class KramovParser:
 
         # Получение ссылок на видео
         try:
-            source_video_urls = driver.find_element(By.XPATH, '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[3]/div[1]/div[1]/div[2]/div[3]/div/div').find_elements(By.TAG_NAME, 'iframe')
+            source_video_urls = driver.find_element(By.XPATH,
+                                                    '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[3]/div[1]/div[1]/div[2]/div[3]/div/div').find_elements(
+                By.TAG_NAME, 'iframe')
             video_urls = [tag_iframe.get_attribute('src') for tag_iframe in source_video_urls]
         except:
             print("[ALARM] Ошибка при поиске ссылки на видео или видео не найдено")
@@ -173,10 +212,10 @@ class KramovParser:
 
         # Получение описания позиции
         # source_description = driver.find_element(By.XPATH, '//*[@id="desc"]/div[1]').find_elements(By.TAG_NAME, 'div')
-        source_description = (driver.find_element(By.XPATH, '//*[@id="desc"]/div[1]'), )
+        source_description = (driver.find_element(By.XPATH, '//*[@id="desc"]/div[1]'),)
         description = {
-            "description":[],
-            "image_url":[],
+            "description": [],
+            "image_url": [],
         }
         description_image_path = f"{general_path}/desctiption_image"
         for desc in source_description:
@@ -188,10 +227,11 @@ class KramovParser:
             for index, link in enumerate(desc.find_elements(By.TAG_NAME, 'a'), 1):
                 link = link.get_attribute('href')
                 description["image_url"].append(link)
-                self.save_image(description_image_path, f"description_image_path_{json_data['vendor_name']}_{product_name}_{index}.{link.split('.')[-1]}", self.get_data_from_url(link, self.HEADERS))
+                self.save_image(description_image_path,
+                                f"description_image_path_{json_data['vendor_name']}_{product_name}_{index}.{link.split('.')[-1]}",
+                                self.get_data_from_url(link, self.HEADERS))
 
         description["description"] = ''.join(description["description"])
-
 
         # Проверка наличия чертежей
         blueprints_urls = []
@@ -199,64 +239,68 @@ class KramovParser:
         try:
             blueprints = driver.find_element(By.XPATH,
                                              '//*[@id="desc"]/div[2]/div/div[3]/div/div[1]/div')
-            if (a:=blueprints.find_elements(By.TAG_NAME, 'a')):
+            if (a := blueprints.find_elements(By.TAG_NAME, 'a')):
                 for index, link in enumerate(a, 1):
                     link = link.get_attribute('href')
-                    self.save_image(blueprints_path, f"blueprints_{json_data['vendor_name']}_{product_name}_{index}.{link.split('.')[-1]}", self.get_data_from_url(link, headers=self.HEADERS))
+                    self.save_image(blueprints_path,
+                                    f"blueprints_{json_data['vendor_name']}_{product_name}_{index}.{link.split('.')[-1]}",
+                                    self.get_data_from_url(link, headers=self.HEADERS))
         except:
             print('[ALARM] Ошибка поиска чертежей или чертежи не найдены')
 
         # Получение объектов по моделям, размерам, типам двигателя и прочему
-        varieties_of_goods = {} # словарь для размещения объектов по разновидностями товаров каждый со своими данными
-        varieties = driver.find_element(By.CLASS_NAME, 'offer-props-wrapper').find_element(By.CLASS_NAME, 'bx_catalog_item_scu').find_elements(By.TAG_NAME, 'div')
-        for varietie in varieties:
-            varietie.find_elements(By.TAG_NAME, 'li')
-            varieties_of_goods.setdefault()
-            break
+        # varieties - заносит все уровни(модель, тип, размер и тп)
+        _varieties = driver.find_element(By.CLASS_NAME, 'offer-props-wrapper').find_elements(By.CLASS_NAME,
+                                                                                             'bx_item_detail_size')
+        reviews = driver.find_element(By.XPATH,
 
-
-            # сбор данных на каждую модель
-        # general_block_data = driver.find_element(By.XPATH, '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[3]/div[1]/div[1]/div[2]')
-        general_block_data = driver.find_element(By.XPATH, '//*[@id="content"]/div[2]/div/div/div/div/div/div[1]/div/div/div[3]/div[1]/div[1]/div[2]')
-        characteristics = {"description": {}, "images": {}}
-        characteristics_image_path = f"{general_path}/characteristics_image"
-        try:
-            general_block = general_block_data.find_element(By.ID, 'props')
-            soup = BeautifulSoup(general_block.get_attribute('outerHTML'),'lxml')
-            characteristics["description"] = general_block.get_attribute('outerHTML')
-            for tag_a in soup.find_all('a'):
-                url = f"{self.BASE_URL}/{tag_a.get('href')}"
-                url_name = tag_a.find_previous('h3').text.strip()
-                characteristics["images"].setdefault(url_name, []).append(url)
-
-            for dir_name, url_list in characteristics["images"].items():
-                for index, u in enumerate(url_list, 1):
-                    self.save_image(f"{characteristics_image_path}/{str(dir_name.replace(':', '').replace('+', 'и').replace('|', 'или'))}", f"image_{json_data['vendor_name']}_{product_name}_{index}.{u.split('.')[-1]}", self.get_data_from_url(f"{self.BASE_URL}/{u}", headers=self.HEADERS))
-        except:
-            print("[ALARM] Ошибка при сборе данных или раздела характеристики нету")
-
-        # Получение отзывов
-        reviews = general_block_data.find_element(By.ID, 'reviews').get_attribute('outerHTML')
-
+                                                 '//*[@id="content"]/div[2]/div/div/div/div/div/div[1]/div/div/div[3]/div[1]/div[1]/div[2]').find_element(By.ID, 'reviews').get_attribute('outerHTML')
 
         products_data.setdefault('product_name', product_name)
         products_data.setdefault('price', price)
         products_data.setdefault('general_attrs', general_attrs)
         products_data.setdefault('doc_path', doc_path)
         products_data.setdefault('photo_path', photo_path)
-        products_data.setdefault('characteristics_image_path', characteristics_image_path)
         products_data.setdefault('description_image_path', description_image_path)
         products_data.setdefault('blueprints_path', blueprints_path)
         products_data.setdefault('video_urls', video_urls)
         products_data.setdefault('product_description', description)
-        products_data.setdefault('characteristics', characteristics)
         products_data.setdefault('blueprints', blueprints_urls)
+
+
+        varietes = []
+
+        keys = []
+        for item in _varieties:
+            varietes.append(item.find_elements(By.TAG_NAME, 'li'))
+        for item in product(*varietes):
+            buffer = []
+            try:
+                for click_item in item:
+                    try:
+                        click_item.click()
+                        buffer.append(click_item.text)
+                    except:
+                        raise
+            except:
+                continue
+
+            keys = '_'.join(buffer)
+
+            data = self.get_characteristics(
+                driver,
+                f"{general_path}/characteristics_image/{keys}",
+                json_data['vendor_name'],
+                product_name
+            )
+            # products_data.setdefault(keys, data)
+
+
+            products_data.setdefault('characteristics_data', {}).setdefault(keys, data)
         products_data.setdefault('reviews', reviews)
 
-        # with open('TEST/test.json', 'w', encoding='utf-8') as f:
-        #     json.dump(products_data, f, indent=3, ensure_ascii=False)
         return products_data
-
+        ###############################################
 
     def run(self):
         driver = self.get_driver()
@@ -271,13 +315,17 @@ class KramovParser:
             vendor_urls = json_data.get('urls', '')
             total_urls = len(vendor_urls)
             try:
-                # for index, url in enumerate(vendor_urls, 1):
-                for  url in ['https://kramov.by/catalog/ventilyatory/2282/', 'https://kramov.by/catalog/ventilyatory/2754/', 'https://kramov.by/catalog/otopitelnoe_oborudovanie/vozdushnye_zavesy/2324/?oid=2325'][::-1]:
+                for index, url in enumerate(vendor_urls, 1):
+                # for url in ['https://kramov.by/catalog/ventilyatory/2282/',
+                #             'https://kramov.by/catalog/ventilyatory/2754/',
+                #             'https://kramov.by/catalog/otopitelnoe_oborudovanie/vozdushnye_zavesy/2324/?oid=2325'][
+                #            ::-1]:
+                    print('Начата обработка URL:', url)
                     product_data = self.get_data_from_one_product(driver, json_data, url, DIR)
                     json_data.get("products_data").append(product_data)
-                    # print(f"[INFO] {index}/{total_urls}")
-                    print(f"[INFO] 1/{total_urls}")
-                    break
+                    print(f"[INFO] {index}/{total_urls}")
+                    # print(f"[INFO] 1/{total_urls}")
+                    # break
             except Exception as e:
                 print(e)
                 raise
