@@ -116,6 +116,7 @@ class KramovParser:
                 url = item.find_element(By.TAG_NAME, 'a').get_attribute('href')
                 urls.add(url)
             except:
+                print('[ALARM] Ошибка при поиске ссылки на товар или товары не найдены')
                 continue
 
         result_json.setdefault('vendor_name', vendor_name)
@@ -151,6 +152,7 @@ class KramovParser:
                                                                                               '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[2]/div/div/div[3]/div[2]/div').find_elements(
                 By.TAG_NAME, 'a')}
         except:
+            print('[ALARM] Ошибка при поиске или загрузке документа или документы не найдены')
             docs_urls = {}
 
         doc_path = f"{general_path}/docs"
@@ -166,6 +168,7 @@ class KramovParser:
             source_video_urls = driver.find_element(By.XPATH, '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[3]/div[1]/div[1]/div[2]/div[3]/div/div').find_elements(By.TAG_NAME, 'iframe')
             video_urls = [tag_iframe.get_attribute('src') for tag_iframe in source_video_urls]
         except:
+            print("[ALARM] Ошибка при поиске ссылки на видео или видео не найдено")
             video_urls = []
 
         # Получение описания позиции
@@ -201,10 +204,16 @@ class KramovParser:
                     link = link.get_attribute('href')
                     self.save_image(blueprints_path, f"blueprints_{json_data['vendor_name']}_{product_name}_{index}.{link.split('.')[-1]}", self.get_data_from_url(link, headers=self.HEADERS))
         except:
-            print('blueprints')
+            print('[ALARM] Ошибка поиска чертежей или чертежи не найдены')
 
         # Получение объектов по моделям, размерам, типам двигателя и прочему
         varieties_of_goods = {} # словарь для размещения объектов по разновидностями товаров каждый со своими данными
+        varieties = driver.find_element(By.CLASS_NAME, 'offer-props-wrapper').find_element(By.CLASS_NAME, 'bx_catalog_item_scu').find_elements(By.TAG_NAME, 'div')
+        for varietie in varieties:
+            varietie.find_elements(By.TAG_NAME, 'li')
+            varieties_of_goods.setdefault()
+            break
+
 
             # сбор данных на каждую модель
         # general_block_data = driver.find_element(By.XPATH, '/html/body/div[5]/div[7]/div[2]/div/div/div/div/div/div[1]/div/div/div[3]/div[1]/div[1]/div[2]')
@@ -224,7 +233,7 @@ class KramovParser:
                 for index, u in enumerate(url_list, 1):
                     self.save_image(f"{characteristics_image_path}/{str(dir_name.replace(':', '').replace('+', 'и').replace('|', 'или'))}", f"image_{json_data['vendor_name']}_{product_name}_{index}.{u.split('.')[-1]}", self.get_data_from_url(f"{self.BASE_URL}/{u}", headers=self.HEADERS))
         except:
-            pass
+            print("[ALARM] Ошибка при сборе данных или раздела характеристики нету")
 
         # Получение отзывов
         reviews = general_block_data.find_element(By.ID, 'reviews').get_attribute('outerHTML')
@@ -263,7 +272,7 @@ class KramovParser:
             total_urls = len(vendor_urls)
             try:
                 # for index, url in enumerate(vendor_urls, 1):
-                for  url in ['https://kramov.by/catalog/ventilyatory/2282/', 'https://kramov.by/catalog/ventilyatory/2754/'][::-1]:
+                for  url in ['https://kramov.by/catalog/ventilyatory/2282/', 'https://kramov.by/catalog/ventilyatory/2754/', 'https://kramov.by/catalog/otopitelnoe_oborudovanie/vozdushnye_zavesy/2324/?oid=2325'][::-1]:
                     product_data = self.get_data_from_one_product(driver, json_data, url, DIR)
                     json_data.get("products_data").append(product_data)
                     # print(f"[INFO] {index}/{total_urls}")
